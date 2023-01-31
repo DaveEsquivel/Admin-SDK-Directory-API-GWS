@@ -1,0 +1,121 @@
+//Variables Globales
+const SS = SpreadsheetApp.getActiveSpreadsheet();
+
+const sheetAgregarUsuarios = SS.getSheetByName('Agregar Usuarios');
+var usuarios = sheetAgregarUsuarios.getDataRange().getValues();
+usuarios.shift();
+
+const sheetGestion = SS.getSheetByName('Gestión de Usuarios');
+var usuariosGestion = sheetGestion.getDataRange().getValues();
+usuariosGestion.shift();
+
+function onOpen(){
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('Gestion de Usuarios')
+  .addItem('✔ Agregar usuarios','agregarUsuarios')
+  .addSeparator()
+  .addItem('▤ Obtener usuarios','obtenerUsuarios')
+  .addItem('⟳ Actualizar usuarios','actualizarUsuarios')
+  .addItem('Ⓘ Suspender/Activar usuarios','suspenderUsuarios')
+  .addItem('╳ Borrar usuarios','borrarUsuarios')
+  .addToUi();
+}
+
+
+function agregarUsuarios() {
+  var usuario ={
+  "name":{
+    "familyName": "",
+    "givenName" : ""
+  },
+  "password": "",
+  "primaryEmail": "",
+  "orgUnitPath": ""
+  };
+
+  usuarios.forEach(filaUsuario =>{
+    //Usuario 10 Apellido 10 usuario10@dominio.com Password10 /Admin
+  usuario.name.givenName = filaUsuario[0];
+  usuario.name.familyName = filaUsuario[1];
+  usuario.primaryEmail = filaUsuario[2];
+  usuario.password = filaUsuario[3];
+  usuario.orgUnitPath = filaUsuario[4];
+  AdminDirectory.Users.insert( usuario );
+  })
+
+}
+
+
+function obtenerUsuarios(){
+
+  if( sheetGestion.getLastRow()>=2){
+    //Borra el contenido previo
+    sheetGestion.getRange(2,1,sheetGestion.getLastRow()-1, 8).clearContent();
+
+  }
+  var argumentos = {
+    "domain": 'test01.grupo-eon.com',
+    "orderBy": 'familyName'
+  }
+  var listaUsuarios = [];
+
+  var response = AdminDirectory.Users.list(argumentos);
+  var usuariosConsola = response.users;
+  usuariosConsola.forEach( usuarioConsola =>{
+  var nombre = usuarioConsola.name.givenName;
+  var apellido = usuarioConsola.name.familyName;
+  var email = usuarioConsola.primaryEmail;
+  var password = usuarioConsola.password;
+  var unidadOrganizativa = usuarioConsola.orgUnitPath;
+  listaUsuarios.push([nombre, apellido, email, password, unidadOrganizativa]);
+  });
+  sheetGestion.getRange(2,1,listaUsuarios.length, listaUsuarios[0].length).setValues( listaUsuarios );
+}
+function actualizarUsuarios(){
+
+  var userObject = {
+    "name":{}
+  }
+
+usuariosGestion.forEach(usuario =>{
+  if( usuario[5] == true){
+    //Update usuario
+    var emailUsuario = usuario[2];
+    userObject.name.givenName = usuario[0];
+    userObject.name.familyName = usuario[1];
+    usuario[3] != '' ? userObject.password = usuario[3] : '';
+    userObject.orgUnitPath = usuario[4];
+    console.log(userObject);
+    AdminDirectory.Users.update(userObject,emailUsuario);
+
+  }
+
+})
+}
+function suspenderUsuarios(){
+  usuariosGestion.forEach(usuario=>{
+    var emailUsuario = usuario [2];
+    if(usuario[6]== true){
+      //Sustpender/Activar usuario
+      AdminDirectory.Users.get(emailUsuario).suspended == true
+      ? AdminDirectory.Users.update({"suspended": false},emailUsuario)
+      : AdminDirectory.Users.update({"suspended": true},emailUsuario);
+    }
+  })
+}
+
+function borrarUsuarios(){
+
+  var ui = SpreadsheetApp.getUi();
+  var answer = ui.alert('Se borraran los usuarios seleccionados de tu organizacion.', ui.ButtonSet.OK_CANCEL);
+  if (answer == ui.Button.OK){
+    //Borrar usuario
+    usuariosGestion.forEach(usuario=>{
+      var emailUsuario = usuario[2];
+      if(usuario[7] == true){
+        AdminDirectory.Users.remove(emailUsuario);
+      }
+    })
+
+  }
+}
